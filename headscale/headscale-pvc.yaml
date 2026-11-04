@@ -1,0 +1,13 @@
+---
+# Headscale server PVC.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: headscale-data-pvc
+  namespace: headscale
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi

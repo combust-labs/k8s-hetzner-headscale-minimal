@@ -1,0 +1,40 @@
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: headscale-gtw
+  namespace: headscale
+  annotations:
+    cert-manager.io/issuer: headscale-le-outside
+spec:
+  gatewayClassName: cilium
+  infrastructure:
+    annotations:
+      load-balancer.hetzner.cloud/hostname: svcs.sh # must be the TLD
+      load-balancer.hetzner.cloud/location: nbg1
+      load-balancer.hetzner.cloud/name: svcssh-lb
+      load-balancer.hetzner.cloud/use-private-ip: "true"
+      load-balancer.hetzner.cloud/http-redirect-https: "false"
+      load-balancer.hetzner.cloud/uses-proxyprotocol: "false" # TLS does not work properly with true
+  listeners:
+  - name: https-headscale
+    protocol: TLS
+    port: 443
+    hostname: "head.svcs.sh"
+    tls:
+      mode: Passthrough
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: TLSRoute
+metadata:
+  name: headscale-route
+  namespace: headscale
+spec:
+  parentRefs:
+  - name: headscale-gtw
+  hostnames:
+  - "head.svcs.sh"
+  rules:
+  - backendRefs:
+    - name: headscale
+      port: 443 # points at a service

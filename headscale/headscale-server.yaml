@@ -1,0 +1,72 @@
+---
+# Headscale server deployment.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: headscale
+  namespace: headscale
+  labels:
+    headscale/component: server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: headscale
+      headscale/component: server
+  template:
+    metadata:
+      labels:
+        app: headscale
+        headscale/component: server
+    spec:
+      containers:
+      - name: headscale
+        image: docker.io/headscale/headscale:0.29.7
+        command: ["headscale", "serve"]
+        ports:
+        - containerPort: 8080
+        volumeMounts:
+        - name: headscale-config
+          mountPath: /etc/headscale
+        - name: headscale-data
+          mountPath: /opt/headscale
+        - name: headscale-tls
+          mountPath: /etc/pki/headscale-outside
+      volumes:
+      - name: headscale-config
+        configMap:
+          name: headscale-config
+      - name: headscale-data
+        persistentVolumeClaim:
+          claimName: headscale-data-pvc
+      - name: headscale-tls
+        secret:
+          secretName: head-outside-certificate-secret
+---
+# Headscale service, attaches to the same Hetzner Load Balancer as defined by the gateway.
+apiVersion: v1
+kind: Service
+metadata:
+  name: headscale
+  namespace: headscale
+  annotations:
+    load-balancer.hetzner.cloud/hostname: svcs.sh # must be the TLD
+    load-balancer.hetzner.cloud/location: nbg1
+    load-balancer.hetzner.cloud/name: svcssh-lb
+    load-balancer.hetzner.cloud/use-private-ip: "true"
+    load-balancer.hetzner.cloud/http-redirect-https: "false"
+    load-balancer.hetzner.cloud/uses-proxyprotocol: "false" # TLS does not work properly with true
+spec:
+  selector:
+    app: headscale
+    headscale/component: server
+  ports:
+  - name: http-headscale
+    protocol: TCP
+    port: 443
+    targetPort: 8080
+  - name: udp-headscale
+    protocol: UDP
+    port: 41641
+    targetPort: 41641
+  type: LoadBalancer

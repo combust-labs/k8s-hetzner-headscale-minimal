@@ -1,0 +1,43 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: headscale-shell
+  namespace: headscale
+  labels:
+    headscale/component: shell
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: headscale
+      headscale/component: shell
+  template:
+    metadata:
+      labels:
+        app: headscale
+        headscale/component: shell
+    spec:
+      containers:
+      - name: headscale
+        image: docker.io/bash:5.3
+        command: ["/bin/sleep", "3600"]
+        ports:
+        - containerPort: 8080
+        volumeMounts:
+        - name: headscale-config
+          mountPath: /etc/headscale
+        - name: headscale-data
+          mountPath: /opt/headscale
+        - name: headscale-tls
+          mountPath: /etc/pki/headscale-outside
+      volumes:
+      - name: headscale-config
+        configMap:
+          name: headscale-config
+      - name: headscale-data
+        persistentVolumeClaim:
+          claimName: headscale-data-pvc
+      - name: headscale-tls
+        secret:
+          secretName: head-outside-certificate-secret

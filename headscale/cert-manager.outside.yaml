@@ -1,0 +1,38 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: headscale-le-outside
+  namespace: headscale
+spec:
+  acme:
+    email: radek@gruchalski.com
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: headscale-le-outside-private-key
+    solvers:
+    - dns01:
+        route53:
+          region: eu-central-1
+          accessKeyIDSecretRef:
+            name: route53-dns01-credential-secret
+            key: access_key_id
+          secretAccessKeySecretRef:
+            name: route53-dns01-credential-secret
+            key: secret_access_key
+          hostedZoneID: Z093150716J6UQV18EQ81
+---
+# Public facing certificate used by the Gateway.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: head-outside-certificate
+  namespace: headscale
+spec:
+  secretName: head-outside-certificate-secret
+  dnsNames:
+  - svcs.sh # remove after 2026.11.02 18:45:00.
+  - head.svcs.sh
+  issuerRef:
+    name: headscale-le-outside
+    kind: Issuer
