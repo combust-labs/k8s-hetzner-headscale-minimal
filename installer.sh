@@ -4,6 +4,8 @@ kubeconfig=""
 set -euo pipefail
 base="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+backup_file=""
+
 cert_manager_ns="cert-manager"
 cert_manager_values_file=""
 cert_manager_version="v1.21.3"
@@ -46,6 +48,10 @@ while (( "$#" )); do
         --cluster-launch)
             cluster_launch=true
             shift
+            ;;
+        --from-backup-file)
+            backup_file="${2}"
+            shift 2
             ;;
         --hcloud-token-file)
             hcloud_token_file="${2}"
@@ -150,6 +156,10 @@ export_kubeconfig
 [ ! -f "${cert_manager_values_file}" ] && echo >&2 "file at --cert-manager-values-file doesn't exist" && exit 1
 [ -z "${route53_dns01_credential_file}" ] && echo >&2 "missing argument: --route53-dns01-credential-file" && exit 1
 [ ! -f "${route53_dns01_credential_file}" ] && echo >&2 "file at --route53-dns01-credential-file doesn't exist" && exit 1
+
+if [ -n "${backup_file}" ]; then
+    [ ! -f "${backup_file}" ] && echo >&2 "file at --from-backup-file doesn't exist" && exit 1
+fi
 
 # Add Gateway API:
 cilium_version=$(cat "${cluster_file}" | yq '.networking.cni.cilium.chart_version' -r | sed -e 's/^v//' | cut -d '.' -f 1,2)
@@ -279,4 +289,22 @@ kubectl apply -f "${base}/headscale/cert-manager.outside.yaml"
 kubectl apply -f "${base}/headscale/cert-manager.inside.yaml"
 kubectl apply -f "${base}/headscale/headscale-pvc.yaml"
 kubectl apply -f "${base}/headscale/headscale-config.yaml"
+
+if [ -n "${backup_file}" ]; then
+    kubectl apply -f "${base}/headscale/headscale-shell.yaml"
+    kubectl rollout status \
+        deployment/headscale-shell \
+        -n headscale \
+        --timeout=90s
+    shell_pod_name=$(kubectl get pods \
+        -l headscale/component=shell \
+        -n headscale \
+        --output jsonpath='{.items[0].metadata.name}')
+    kubectl cp "${backup_file}" \
+        "headscale/${shell_pod_name}:/opt/headscale/db.sqlite"
+    kubectl exec -ti "${shell_pod_name}" -n headscale \
+        -- chown root:root /opt/headscale/db.sqlite
+    kubectl scale deployment/headscale-shell -n headscale --replicas 0
+fi
+
 kubectl apply -f "${base}/headscale/headscale-server.yaml"

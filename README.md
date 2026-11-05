@@ -4,16 +4,18 @@ This example installs and configures Headscale on Kubernetes hosted in Hetzner. 
 
 The example uses:
 - Cilium for CNI, ingress, and egress.
-- cert-manager for external and internal TLS using dns01 challenge,
+- cert-manager for external and internal TLS using dns01 challenge.
 - AWS Route53 to facilitate the _dn01_ ACME challenge, used by cert-manager issuers.
 - Gateway API.
 - A Tailnet, the Tailscale network, exposed with Headscale, a self-hosted Tailnet VPN.
+
+Written by a human. No LLM used here.
 
 ## Tools
 
 To perform tasks described below, the following tools are necessary:
 
-- a patched hetzner-k3s version, described below,
+- A patched hetzner-k3s version, described below.
 - Helm, kubectl, yq, bash.
 
 ## Install hetzner-k3s
@@ -138,17 +140,32 @@ For your own cluster, modify issuers in `headscale/cert-manager.*.yaml` files. S
     --cluster-bootstrap
 ```
 
+or using a previous backup:
+
+```sh
+"$(pwd)/installer.sh" \
+    --cluster-file "$(pwd)/bootstrap/cluster.yaml" \
+    --cert-manager-values-file "$(pwd)/bootstrap/cert-manager-values.yaml" \
+    --route53-dns01-credential-file "${HOME}/.hetzner/aws/svcssh-cert-manager-head-in" \
+    --from-backup-file "/absolute/path/to/the/db.sqlite" \
+    --cluster-bootstrap
+```
+
 Following components become available:
 
 - GatewayAPI with experimental TLS route support.
 - The default Cilium `GatewayClass`, this cannot be installed by Cilium Helm installer because the feature depends on the existence of the GatewayAPI CRDs.
 - cert-manager.
 - Headscale:
-  - outside and inside cert-manager issuers, with certificates,
-  - the gateway with its TLS route,
-  - the deployment with its config map and a PVC, Headscale is currently configured with HA and sqlite as a backend,
+  - Outside and inside cert-manager issuers, with certificates.
+  - The gateway with a TLS route.
+  - The Headscale deployment with relevant config map and a PVC, configured using recommended sqlite backend,
   - the LoadBalancer service with Hetzner load balancer annotations,
-    - no GatewayAPI for this endpoint because Hetzner cloud controller requires a service to update the load balancer,
+    - no GatewayAPI for this endpoint because Hetzner cloud controller requires a service to update the load balancer. This is not a duplication, the Gateway configures Cilium, the service configures the external load balancer.
+
+### Changing the domain name
+
+To change the domain name, change files. Search for `svcs` across all files and replace accordingly.
 
 ## When things go wrong
 
